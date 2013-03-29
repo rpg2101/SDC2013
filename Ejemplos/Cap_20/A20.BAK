@@ -1,0 +1,64 @@
+        segment Pila stack
+          resw 512
+FinPila:
+        
+        segment Datos
+MsgActiva db 'La línea A20 está activa.$'
+MsgNoActiva db 'La línea A20 no está activa.$'
+
+;*********************************
+; Segmento de código
+;*********************************
+        segment Codigo
+..start:
+Inicio:
+        ; Preparar los registros de pila
+        mov ax, Pila
+        mov ss, ax
+        mov sp, FinPila
+        
+        ; y del segmento de datos
+        mov ax, Datos
+        mov ds, ax
+        
+        mov ah, 62h
+        int 21h
+        mov es, bx
+        mov di, 80h
+        
+        cmp byte [es:di], 0
+        jz NoHayParametros
+        
+        in al, 92h
+        cmp byte [es:di+2], '1'
+        je Activar
+        
+        and al, 0FDh
+        jmp CambiarEstado
+        
+Activar:
+        or al, 2
+        
+CambiarEstado:
+        out 92h, al
+        
+NoHayParametros:        
+        
+        mov dx, MsgActiva
+
+        in al, 92h
+        test al, 2
+        jnz Activa
+        
+        mov dx, MsgNoActiva
+Activa:
+        mov ah, 9
+        int 21h        
+        
+Salir:        
+        ; devolvemos el control
+        ; al sistema
+        mov ah, 4Ch
+        int 21h
+        
+        

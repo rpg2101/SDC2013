@@ -1,0 +1,90 @@
+        segment Pila stack
+          resw 512
+FinPila:
+        
+        segment Datos
+; Mensajes informativos        
+MsgNoDPMI db 'No hay servicios DPMI.$'
+MsgProcesador db 'El tipo de procesador es '
+  Procesador db '?',13,10,10,'$'
+MsgSi32Bits db 'Puede ejecutar programas de 32 bits.',13,10,10,'$'
+MsgNo32Bits db 'No puede ejecutar programas de 32 bits.',13,10,10,'$'
+MsgVersion db 'La versión de DPMI es la '
+   Vers1 db '0.'
+   Vers2 db '00',13,10,10,'$'
+MsgParrafos db 'Se necesitan '
+   Parrafos db '     '
+            db ' párrafos de memoria para el acceso.',13,10,10,'$'
+
+;*********************************
+; Segmento de código
+;*********************************
+        segment Codigo
+..start:
+Inicio:
+        ; Preparar los registros de pila
+        mov ax, Pila
+        mov ss, ax
+        mov sp, FinPila
+        
+        ; y del segmento de datos
+        mov ax, Datos
+        mov ds, ax
+        mov es, ax
+
+        mov ax,1687h
+        int 2fh
+        
+        or ax, ax
+        jnz Error
+        
+        add dh, '0'
+        mov [Vers1], dh
+        mov al, dl
+        mov dl, 10
+        div dl
+        add ah, '0'
+        add al, '0'
+        mov [Vers2], al
+        mov [Vers2+1], ah 
+        mov dx, MsgVersion
+        mov ah, 9
+        int 21h
+        
+        mov al, cl
+        add al, '0'
+        mov [Procesador], al
+        
+        mov dx,MsgProcesador
+        mov ah, 9
+        int 21h
+        
+        mov ax, si
+        mov di, Parrafos+4
+        call EnteroCadena
+        mov dx, MsgParrafos
+        mov ah, 9
+        int 21h
+        
+        mov dx, MsgSi32Bits
+        
+        test bx, 1
+        jnz Salir
+        
+        mov dx, MsgNo32Bits
+        jmp Salir
+        
+Error:
+        mov dx, MsgNoDPMI
+
+Salir:        
+        
+        mov ah, 9
+        int 21h
+
+        ; devolvemos el control
+        ; al sistema
+        mov ah, 4Ch
+        int 21h
+        
+%include "Convert.inc"        

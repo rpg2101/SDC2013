@@ -1,0 +1,48 @@
+        segment Pila stack
+          resw 512
+FinPila:
+
+        segment Datos
+MsgHayEPP db 'Está instalada la BIOS EPP$'
+MsgNoHayEPP db 'No está instalada la BIOS EPP$'         
+        ; Segmento de código
+        segment Codigo
+..start:
+        ; Configuramos la pila
+        mov ax, Pila
+        mov ss, ax
+        mov sp, FinPila
+        
+        ; DS apunta al segmento
+        ; que contiene los datos
+        mov ax, Datos
+        mov ds, ax
+
+        mov ax, 200h
+        mov bx, 'PP'
+        mov ch, 'E'
+        xor dx, dx
+        
+        int 17h
+        
+        or al, al
+        jnz NoHayEPP
+        cmp al, 45
+        jnz NoHayEPP
+        cmp cx, 'PP'
+        jnz NoHayEPP
+        
+        mov dx, MsgHayEPP
+        jmp Salir
+
+NoHayEPP:        
+        mov dx, MsgNoHayEPP
+        
+Salir:
+        mov ah, 9
+        int 21h
+                
+        ; y salimos
+        mov ah, 4ch
+        int 21h
+        

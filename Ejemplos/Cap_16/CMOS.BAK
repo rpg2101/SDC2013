@@ -1,0 +1,248 @@
+
+        segment Pila stack
+          resw 512
+FinPila:
+
+        segment Datos
+
+MsgMemoriaBase      db '      Ks de memoria base - $'
+MsgMemoriaExtendida db '      Ks de memoria extendida', 13, 10, '$'
+
+MsgDisquetera       db 'La disquetera '
+  LetraDisquetera   db 'A: es de tipo $'
+
+Disquetera0 db '<No está instalada>$'
+Disquetera1 db '<5.25" y 360 Ks>$'
+Disquetera2 db '<5.25" y 1.2 Mb>$'
+Disquetera3 db '<3.5" y 720 Ks>$'
+Disquetera4 db '<3.5" y 1.44 Mb>$'
+
+TblPunteros dw Disquetera0, Disquetera1, Disquetera2, Disquetera3, Disquetera4
+
+AvanceLinea db 13, 10, '$'
+
+        ; Segmento de código
+        segment Codigo
+..start:
+        ; Configuramos la pila
+        mov ax, Pila
+        mov ss, ax
+        mov sp, FinPila
+        
+        ; DS y ES apuntan al segmento
+        ; que contiene los datos
+        mov ax, Datos
+        mov ds, ax
+        mov es, ax
+
+        call MemoriaBase
+        
+        call MemoriaExtendida
+        
+        call Disqueteras
+        
+                
+        ; y salimos
+        mov ah, 4ch
+        int 21h
+
+MemoriaBase:
+        ; leemos cantidad de
+        ; memoria base
+        mov bl, 22
+        call LeeCMOS
+        ; guardamos el byte de
+        ; mayor peso en AH
+        mov ah, al
+        ; y leemos el de
+        ; menor peso
+        dec bl
+        call LeeCMOS
+        
+        ; Tenemos en AX la 
+        ; cantidad de memoria base
+        
+        ; la convertimos a cadena
+        mov di, MsgMemoriaBase+4
+        call EnteroCadena
+
+        ; y mostramos
+        mov dx, MsgMemoriaBase
+        mov ah, 9
+        int 21h        
+         
+        ret
+        
+MemoriaExtendida:
+        ; leemos cantidad de
+        ; memoria extendida
+        mov bl, 49
+        call LeeCMOS
+        ; guardamos el byte de
+        ; mayor peso en AH
+        mov ah, al
+        ; y leemos el de
+        ; menor peso
+        dec bl
+        call LeeCMOS
+        
+        ; Tenemos en AX la 
+        ; cantidad de memoria extendida
+        
+        ; la convertimos a cadena
+        mov di, MsgMemoriaExtendida+4
+        call EnteroCadena
+
+        ; y mostramos
+        mov dx, MsgMemoriaExtendida
+        mov ah, 9
+        int 21h        
+
+        ret                
+
+Disqueteras:
+        ; leemos el byte correspondiente
+        ; al tipo de las disqueteras
+        mov bl, 16
+        call LeeCMOS
+        
+        push ax ; guardamos el dato
+        
+        ; nos quedamos con el
+        ; nibble de la primera
+        ; unidad
+        shr al, 4
+        
+        call ResuelveUnidad
+        
+        mov byte [LetraDisquetera], 'B'
+        pop ax
+        
+        and al, 0fh
+        call ResuelveUnidad
+        
+        ret
+        
+ResuelveUnidad:
+        push ax
+        
+        ; imprimimos la primera
+        ; parte del mensaje
+        mov dx, MsgDisquetera
+        mov ah, 9
+        int 21h
+        
+        pop ax
+        
+        ; multiplicamos AL
+        ; por 2        
+        mov bl, 2
+        mul bl
+        
+        ; BX apunta a la tabla
+        ; de punteros
+        mov bx, TblPunteros
+        ; le sumamos AX
+        ; como desplazamiento
+        add bx, ax
+        
+        ; tomamos la dirección
+        ; de la cadena apropiada
+        mov dx, [bx]
+        
+        ; y la imprimimos
+        mov ah, 9
+        int 21h
+
+        mov dx, AvanceLinea
+        mov ah, 9
+        int 21h
+        
+        ret ; volver
+                
+
+;-----------------------
+; Esta rutina recupera
+; un byte de información
+; de la memoria CMOS.
+; Debe indicarse la 
+; dirección en BL y se
+; devuelve el dato en AL
+;-----------------------
+LeeCMOS:
+        ; leemos el valor
+        ; del puerto 70h
+        in al, 70h
+        ; ponemos a 0 los 5
+        ; bits de menor peso
+        and al, 128
+        ; y sumamos la 
+        ; dirección indicada
+        or al, bl
+        
+        ; seleccionamos 
+        ; dirección
+        out 70h, al
+        ; y leemos el dato
+        in al, 71h
+        
+        ; volvemos
+        ret
+        
+;-----------------------------
+; Este procedimiento convierte
+; el valor de AX en una cadena
+; de hasta cinco caracteres
+; 
+; Entrada: AX = número a convertir
+;          ES:DI = destino cadena
+;-----------------------------
+EnteroCadena:
+        ; DX debe estar a cero
+        push dx ; lo guardamos
+        xor dx, dx
+        
+        ; establecemos valor inicial
+        mov byte [di], '0'
+        
+        ; comprobamos si AL es cero
+        or ax, ax
+        ; de ser así, no hay más
+        ; que hacer
+        jz FinConversion
+
+        push bx ; guardamos bx
+        ; y establecemos el divisor
+        mov bx, 10        
+        
+ Bucle0:
+        ; vamos dividiendo por 10
+        div bx 
+        
+        ; quedándonos con el resto
+        ; que convertimos a ASCII
+        add dl, '0'
+        ; y guardamos
+        mov [di], dl
+        ; retrocediendo al dígito anterior
+        dec di
+        
+        ; eliminamos el contenido
+        ; de DX para quedarnos con
+        ; el cociente de AX
+        xor dx, dx
+        
+        ; si el cociente es mayor que 9
+        cmp ax, 9
+        ; seguimos dividiendo
+        ja Bucle0
+        
+        ; en caso contrario guardamos
+        add al, '0'
+        mov [di], al
+        
+        pop bx ; recuperamos BX
+        
+FinConversion:
+        pop dx ; recuperamos DX
+        ret

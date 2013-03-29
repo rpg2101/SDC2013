@@ -1,0 +1,287 @@
+;--------------------------------
+; Esta macro coloca el cursor 
+; en el punto indicado sin
+; modificar registros
+;--------------------------------
+%macro PosicionCursor 2
+        push ax ; guardar AX
+        push bx ; BX y DX
+        push dx
+        
+        ; posición del cursor
+        mov dl, %1
+        mov dh, %2
+        
+        ; Ponemos el cursor en la
+        ; posición indicada
+        xor bh, bh
+        mov ah, 2
+        int 10h
+        
+        ; restauramos registros
+        pop dx
+        pop bx
+        pop ax
+%endmacro        
+
+;--------------------------------
+; Esta macro escribe el carácter
+; indicada en la posición actual
+;--------------------------------
+%macro EscribeCaracter 3
+        push ax ; guardamos
+        push bx ; registros
+        push cx
+        
+        ; establecemos 
+        ; carácter y atributo
+        mov bl, %3
+        mov al, %1
+        xor bh, bh
+        mov cx, %2
+        
+        ; escribimos el carácter
+        mov ah, 9
+        int 10h
+        
+        ; recuperamos registros
+        pop cx
+        pop bx
+        pop ax
+%endmacro        
+
+        segment Pila stack
+          resw 512
+FinPila:
+
+        segment Datos
+EsqSI equ 218
+EsqII equ 192
+EsqSD equ 191
+EsqID equ 217
+Horz equ 196
+Vert equ 179
+        
+    PosX equ 0
+    PosY equ 1
+    Servicio equ 2
+    Mascara equ 3
+    Longitud equ 4
+    Texto equ 5
+    
+    TamanoTecla equ 15
+
+Teclas db 10, 10, 2, 64, 10, 'Bloq Mayús'
+       db 12, 15, 2, 2, 5,   'Mayús     '
+       db 15, 20, 12h, 1, 7,  'Control   '
+       db 25, 20, 12h, 2, 3,  'Alt       '
+       db 55, 20, 12h, 8, 3,  'Alt       '
+       db 65, 20, 12h, 4, 7,  'Control   '
+       db 70, 15, 2, 1, 5,   'Mayús     '
+       db 50, 6, 2, 16, 10, 'Bloq Despl'
+       db 68, 6, 2, 32, 8,  'Bloq Núm  '
+        
+Atributo db 0
+                                 
+        ; Segmento de código
+        segment Codigo
+..start:
+        ; Configuramos la pila
+        mov ax, Pila
+        mov ss, ax
+        mov sp, FinPila
+        
+        ; DS apunta al segmento
+        ; que contiene los datos
+        mov ax, Datos
+        mov ds, ax
+        
+        call LimpiaPantalla
+        
+        call OcultaCursor
+
+Bucle0:
+        mov bx, Teclas
+        mov cx, 9        
+
+Bucle1:
+        call CompruebaTecla
+        
+        call DibujaMarco
+        
+        call ImprimeTexto
+        
+        ; pasar al siguiente 
+        ; elemento de la tabla
+        add bx, TamanoTecla    
+      
+        ; si se ha pulsado Esc
+        call ExaminaTeclado
+        ; terminamos
+        jc Salir
+        
+        loop Bucle1 ; repetir
+        
+        jmp Bucle0
+Salir:
+        call RestauraCursor
+        
+        ; devolver el control al sistema
+        mov ah, 4ch
+        int 21h        
+
+LimpiaPantalla:
+        PosicionCursor 0, 0
+        EscribeCaracter ' ', 2000, 7        
+        ret
+        
+;--------------------------------
+; Esta rutina examina el teclado 
+; para ver si hay alguna tecla
+; pulsada
+;---------------------------------       
+ExaminaTeclado:
+        ; comprobamos si hay 
+        ; alguna tecla pulsada
+        mov ah, 1
+        int 16h
+
+        ; Si Z está a 1 es que no
+        jz NoHayTeclas
+        
+        ; de haberla la extraemos
+        xor ah, ah
+        int 16h
+        
+        ; comprobar si es Esc
+        cmp al, 27
+        ; de no ser así saltar
+        jne NoEsESC
+        
+        ; en caso contrario
+        ; activar el carry
+        stc
+        
+        ret ; y volver
+        
+NoHayTeclas:
+        xor ax, ax    
+            
+NoEsESC:        
+        clc ; poner a 0 el carry
+        ret ; volver
+        
+      
+;----------------------------
+; DS:BX apunta al elemento de
+; la tabla cuya tecla hay que
+; comprobar
+;----------------------------      
+CompruebaTecla:
+        mov ah, [bx+Servicio]
+        int 16h
+        
+        cmp byte [bx+Servicio], 12h
+        jne Continua
+        
+        xchg ah, al
+Continua:        
+        and al, [bx+Mascara]
+        jnz Pulsada
+        
+        mov byte [Atributo], 7
+        ret
+Pulsada:
+        mov byte [Atributo], 60h
+        ret        
+
+;-------------------------------
+; Esta rutina dibujará el marco
+; según los parámetros del 
+; elemento apuntado por BX
+;-------------------------------
+DibujaMarco:
+        pusha
+        
+        mov al, [bx+PosX]
+        mov ah, [bx+PosY]
+        mov dl, [Atributo]
+        mov cl, [bx+Longitud]
+        xor ch, ch
+        
+        PosicionCursor al, ah
+        EscribeCaracter EsqSI, 1, dl
+        
+        inc ah
+        PosicionCursor al, ah
+        EscribeCaracter Vert, 1, dl
+        
+        inc ah
+        PosicionCursor al, ah
+        EscribeCaracter EsqII, 1, dl
+        
+        inc al
+        PosicionCursor al, ah
+        EscribeCaracter Horz, cx, dl
+        
+        sub ah, 2
+        PosicionCursor al, ah
+        EscribeCaracter Horz, cx, dl
+        
+        add al, cl
+        PosicionCursor al, ah
+        EscribeCaracter EsqSD, 1, dl
+        
+        inc ah
+        PosicionCursor al, ah
+        EscribeCaracter Vert, 1, dl
+        
+        inc ah
+        PosicionCursor al, ah
+        EscribeCaracter EsqID, 1, dl
+        
+        popa
+        ret
+        
+ImprimeTexto:
+        pusha
+        
+        mov dl, [bx+PosX]
+        inc dl
+        mov dh, [bx+PosY]
+        inc dh
+        mov cl, [bx+Longitud]
+        xor ch, ch
+        mov si, bx
+        add si, Texto
+        mov bl, [Atributo]
+        
+BucleI0:
+        lodsb
+        PosicionCursor dl, dh
+        EscribeCaracter al, 1, bl
+        
+        inc dl
+        loop BucleI0
+        
+        popa
+        ret
+        
+                
+        
+OcultaCursor:
+        mov ch, 64
+        xor cl, cl
+        mov ah, 1
+        int 10h
+        
+        ret
+        
+RestauraCursor:
+        mov ch, 6
+        mov cl, 7
+        mov ah, 1
+        int 10h
+        
+        ret
+                        

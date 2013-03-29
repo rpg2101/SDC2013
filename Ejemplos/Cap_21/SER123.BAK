@@ -1,0 +1,57 @@
+;*********************
+; Segmento de pila
+;*********************
+Pila segment stack 'stack'
+        db 256 dup (?)  
+FinPila:        
+Pila ends
+                                  
+;*********************
+; Segmento de datos
+;*********************
+Datos segment 'data'
+
+    ; Mensajes
+MsgExiste Db 'El controlador está instalado.$'
+MsgNoExiste Db 'El controlador no está instalado.$'
+       
+Datos ends
+
+;*********************
+; Segmento de código
+;*********************
+Codigo segment 'code'
+       assume CS:Codigo, DS:Datos, SS:Pila
+Main:
+    ; Configuramos los registros de pila
+    mov ax, seg Pila
+    mov ss, ax
+    mov sp, FinPila
+
+    ; y los del segmento de datos
+    mov ax, seg Datos
+    mov ds, ax                   
+
+    Mov AH, 123
+    Xor AL, AL
+    int 2Fh
+    
+    Or AL, AL
+    Jz NoExiste
+    
+    Mov DX, Offset MsgExiste
+    jmp Salir
+    
+NoExiste:
+    Mov DX, Offset MsgNoExiste
+        
+Salir:    
+    Mov AH, 9
+    Int 21h
+    
+    Mov AH, 4Ch
+    Int 21h
+    
+Codigo  ends
+
+        end Main
