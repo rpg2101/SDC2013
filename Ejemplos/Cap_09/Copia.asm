@@ -1,6 +1,5 @@
         segment Datos
-; Reservamos espacio para poder
-; guardar el contenido de la pantalla
+
 Pantalla resb 25*80*2
 
         segment Pila stack
@@ -78,4 +77,3 @@ Salir:
         ; salimos al sistema
         mov ah, 4ch
         int 21h
-

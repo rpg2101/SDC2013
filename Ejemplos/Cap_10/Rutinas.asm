@@ -27,6 +27,8 @@ FinPila:
         mov ax, Datos
         mov ds, ax
         
+        ; imprimir
+        
         xor ah, ah ; esperamos una tecla
         int 16h
         
